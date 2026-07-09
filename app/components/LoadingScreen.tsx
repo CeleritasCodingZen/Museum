@@ -44,12 +44,19 @@ export default function LoadingScreen({ onComplete }: LoadingScreenProps) {
   useGSAP(() => {
     if (!containerRef.current) return;
 
+    console.log("LOADING START");
+
     const tl = gsap.timeline({
       onComplete: () => {
         /* ═══════════════════════════════════════════
            EXIT — Archive doors open with warm light
            ═══════════════════════════════════════════ */
-        const exit = gsap.timeline({ onComplete });
+        const exit = gsap.timeline({ 
+          onComplete: () => {
+            console.log("LOADING COMPLETE");
+            onComplete();
+          } 
+        });
 
         // Content fades
         exit.to(contentRef.current, {
@@ -72,7 +79,56 @@ export default function LoadingScreen({ onComplete }: LoadingScreenProps) {
       },
     });
 
+    /* ═══════════════════════════════════════════════════════════
+       PHASE 1 — SYSTEM AWAKENING (0–2.5s)
+       "An old scientific machine activating"
+       ═══════════════════════════════════════════════════════════ */
 
+   
+    /* ═══════════════════════════════════════════════════════════
+       PHASE 2 — RESTORATION PROCESS (2.5–5s)
+       "A museum archive waking up"
+       ═══════════════════════════════════════════════════════════ */
+
+    tl.set(phase2Ref.current, { opacity: 1 });
+
+    // "RESTORING HISTORICAL DATABASE..." typewriter
+    tl.to(restoringTextRef.current, {
+      text: { value: "RESTORING HISTORICAL DATABASE...", delimiter: "" },
+      duration: 1,
+      ease: "none",
+    });
+
+    // "MEMORY BLOCK" label fades in
+    tl.fromTo(
+      progressLabelRef.current,
+      { opacity: 0 },
+      { opacity: 1, duration: 0.4, ease: "power2.out" },
+      "-=0.3"
+    );
+
+    // Progress blocks fill sequentially — scientific instrument reading
+    const blocks = progressBlocksRef.current?.querySelectorAll(".mem-block");
+    if (blocks) {
+      blocks.forEach((block, i) => {
+        tl.to(
+          block,
+          {
+            opacity: 1,
+            backgroundColor: "var(--bronze)",
+            duration: 0.12,
+            ease: "steps(1)",
+          },
+          i === 0 ? undefined : `-=${0.04}`
+        );
+      });
+    }
+
+    // Brief hold — system stabilizes
+    tl.to({}, { duration: 0.4 });
+
+    // Phase 2 exits
+    tl.to(phase2Ref.current, { opacity: 0, duration: 0.3, ease: "power2.in" });
 
     /* ═══════════════════════════════════════════════════════════
        PHASE 3 — ARCHIVE COUNTER (5–7.5s)

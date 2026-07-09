@@ -29,10 +29,10 @@ export default function Home() {
         <HeroSection isReady={loadingComplete} />
 
         {/* Museum manifesto — emotional preparation before the archive */}
-        <TechnologyIntro />
+        <TechnologyIntro isReady={loadingComplete} />
 
         {/* 7 Artifact pages — each a unique cinematic experience */}
-        <ArtifactPages />
+        <ArtifactPages isReady={loadingComplete} />
       </main>
     </SmoothScroll>
   );

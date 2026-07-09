@@ -1,12 +1,11 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useEffect } from "react";
 import { gsap } from "gsap";
 import { ScrollTrigger } from "gsap/ScrollTrigger";
-import { SplitText } from "gsap/SplitText";
 import { useGSAP } from "@gsap/react";
 
-gsap.registerPlugin(ScrollTrigger, SplitText);
+gsap.registerPlugin(ScrollTrigger);
 
 /* ════════════════════════════════════════════════════════════════
    DESIGN TOKENS — shared palette with the rest of the museum
@@ -21,30 +20,50 @@ const ARCHIVE_RED = "#8B2E2E";
 /* ════════════════════════════════════════════════════════════════
    METADATA LABELS — museum-catalog taxonomy, deliberately quiet
    ════════════════════════════════════════════════════════════════ */
-const TAXONOMY = [
-  "FIRE",
-  "LANGUAGE",
-  "TOOLS",
-  "MATHEMATICS",
+const TAXONOMY = ["FIRE", "LANGUAGE", "TOOLS", "MATHEMATICS", "ASTRONOMY", "COMPUTATION"];
 
-  "ASTRONOMY",
-  "COMPUTATION",
-];
+/* Pre-computed dust particle data — deterministic to avoid SSR/client hydration mismatch */
+const DUST_PARTICLES = Array.from({ length: 18 }, (_, i) => {
+  const seed = (i: number, offset: number) => {
+    const v = ((i + offset) * 2654435761) >>> 0;
+    return (v % 10000) / 10000;
+  };
+  return {
+    w: 1 + seed(i, 1) * 2,
+    h: 1 + seed(i, 2) * 2,
+    opacity: 0.08 + seed(i, 3) * 0.12,
+    left: seed(i, 4) * 100,
+    top: 60 + seed(i, 5) * 40,
+    driftY: 40 + seed(i, 6) * 60,
+    driftX: -20 + seed(i, 7) * 40,
+    dur: 8 + seed(i, 8) * 12,
+    del: seed(i, 9) * 10,
+  };
+});
 
-/* Fixed positions for ambient dust motes — deliberate, not random-on-every-render */
-const DUST = [
-  { top: "18%", left: "22%", size: 2, dur: 9 },
-  { top: "34%", left: "78%", size: 1.5, dur: 11 },
-  { top: "62%", left: "14%", size: 2, dur: 13 },
-  { top: "72%", left: "84%", size: 1.5, dur: 10 },
-  { top: "48%", left: "50%", size: 1, dur: 14 },
-  { top: "12%", left: "60%", size: 1.5, dur: 8 },
-];
+/* ════════════════════════════════════════════════════════════════
+   ANIMATION CONSTANTS — one physics language, used everywhere
+   ════════════════════════════════════════════════════════════════ */
+const SECTION_HIDDEN = { opacity: 0, y: 80 };
+const SECTION_VISIBLE = { opacity: 1, y: 0, duration: 1.4, ease: "expo.out" };
+
+const BLOCK_HIDDEN = { opacity: 0, y: 60, filter: "blur(12px)", scale: 0.96 };
+const BLOCK_VISIBLE = {
+  opacity: 1,
+  y: 0,
+  filter: "blur(0px)",
+  scale: 1,
+  duration: 1.3,
+  ease: "expo.out",
+};
+
+const META_HIDDEN = { opacity: 0, y: 24, filter: "blur(8px)" };
+const META_VISIBLE = { opacity: 0.55, y: 0, filter: "blur(0px)", duration: 1.1, ease: "expo.out" };
 
 /* ════════════════════════════════════════════════════════════════
    COMPONENT
    ════════════════════════════════════════════════════════════════ */
-export default function TechnologyIntro() {
+export default function TechnologyIntro({ isReady }: { isReady: boolean }) {
   const wrapRef = useRef<HTMLDivElement>(null);
 
   /* Moment refs */
@@ -52,7 +71,6 @@ export default function TechnologyIntro() {
   const m1Line1Ref = useRef<HTMLDivElement>(null);
   const m1Line2Ref = useRef<HTMLDivElement>(null);
   const m1MetaRef = useRef<HTMLDivElement>(null);
-  const m1SpotRef = useRef<HTMLDivElement>(null);
 
   const m2Ref = useRef<HTMLDivElement>(null);
   const m2Line1Ref = useRef<HTMLDivElement>(null);
@@ -60,17 +78,17 @@ export default function TechnologyIntro() {
   const m2Line3Ref = useRef<HTMLDivElement>(null);
 
   const m3Ref = useRef<HTMLDivElement>(null);
-  const m3Para1Ref = useRef<HTMLDivElement>(null);
-  const m3Para2Ref = useRef<HTMLDivElement>(null);
   const m3RuleRef = useRef<HTMLDivElement>(null);
+  const m3Para1InnerRef = useRef<HTMLDivElement>(null);
+  const m3Para1Line2InnerRef = useRef<HTMLDivElement>(null);
+  const m3Para2InnerRef = useRef<HTMLDivElement>(null);
+  const m3AttribRef = useRef<HTMLDivElement>(null);
 
   const m4Ref = useRef<HTMLDivElement>(null);
-  const m4WordWrapRef = useRef<HTMLDivElement>(null);
   const m4WordRef = useRef<HTMLDivElement>(null);
-  const m4SweepRef = useRef<HTMLDivElement>(null);
   const m4SubRef = useRef<HTMLDivElement>(null);
   const m4TaxRef = useRef<HTMLDivElement>(null);
-  const m4DimRef = useRef<HTMLDivElement>(null);
+  const m4SweepRef = useRef<HTMLDivElement>(null);
 
   const m5Ref = useRef<HTMLDivElement>(null);
   const m5Line1Ref = useRef<HTMLDivElement>(null);
@@ -79,536 +97,288 @@ export default function TechnologyIntro() {
   const m5CountRef = useRef<HTMLDivElement>(null);
   const m5DoorRef = useRef<HTMLDivElement>(null);
 
-  /* Spotlight + atmosphere refs */
+  /* Spotlight ref */
   const spotRef = useRef<HTMLDivElement>(null);
-  const grainRef = useRef<HTMLDivElement>(null);
+
+  /* Film grain canvas */
+  const grainRef = useRef<HTMLCanvasElement>(null);
+
+  /* Dust container */
+  const dustRef = useRef<HTMLDivElement>(null);
+
+  /* ──────────── FILM GRAIN — subtle analog texture ──────────── */
+  useEffect(() => {
+    const canvas = grainRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return;
+
+    let animId: number;
+    const w = 256;
+    const h = 256;
+    canvas.width = w;
+    canvas.height = h;
+
+    function renderGrain() {
+      const imgData = ctx!.createImageData(w, h);
+      const d = imgData.data;
+      for (let i = 0; i < d.length; i += 4) {
+        const v = (Math.random() * 255) | 0;
+        d[i] = v;
+        d[i + 1] = v;
+        d[i + 2] = v;
+        d[i + 3] = 14; // very subtle
+      }
+      ctx!.putImageData(imgData, 0, 0);
+      animId = requestAnimationFrame(renderGrain);
+    }
+    renderGrain();
+    return () => cancelAnimationFrame(animId);
+  }, []);
 
   /* ──────────── GSAP ORCHESTRATION ──────────── */
   useGSAP(
     () => {
-      if (!wrapRef.current) return;
+      if (!isReady || !wrapRef.current) return;
+
+      console.log("SCROLL READY");
 
       const ctx = gsap.context(() => {
-        /* ═══════════════════════════════════════════════════════
-           HELPER — cinematic "camera" entrance for a whole section
-           scale 0.96→1 · opacity 0.4→1 · blur(10px)→0 · power4.out
-        ═══════════════════════════════════════════════════════ */
-        function cameraReveal(el: HTMLElement, trigger: HTMLElement, start = "top 82%") {
-          gsap.set(el, {
-            scale: 0.96,
-            opacity: 0.4,
-            filter: "blur(10px)",
-            transformOrigin: "center center",
-          });
-          ScrollTrigger.create({
-            trigger,
-            start,
-            onEnter: () => {
-              gsap.to(el, {
-                scale: 1,
-                opacity: 1,
-                filter: "blur(0px)",
-                duration: 1.6,
-                ease: "power4.out",
-              });
-            },
-            onLeaveBack: () => {
-              gsap.to(el, {
-                scale: 0.96,
-                opacity: 0.4,
-                filter: "blur(10px)",
-                duration: 0.7,
-                ease: "power2.in",
-              });
-            },
-          });
-        }
+        /* ════════════════════════════════════════════
+           PERFORMANCE HINT
+           Every element that will be tweened gets a
+           will-change hint up front.
+        ════════════════════════════════════════════ */
+        const allAnimatedEls = [
+          m1Ref.current,
+          m1Line1Ref.current,
+          m1Line2Ref.current,
+          m1MetaRef.current,
+          m2Ref.current,
+          m2Line1Ref.current,
+          m2Line2Ref.current,
+          m2Line3Ref.current,
+          m3Ref.current,
+          m3RuleRef.current,
+          m3Para1InnerRef.current,
+          m3Para1Line2InnerRef.current,
+          m3Para2InnerRef.current,
+          m3AttribRef.current,
+          m4Ref.current,
+          m4WordRef.current,
+          m4SubRef.current,
+          m4TaxRef.current,
+          m4SweepRef.current,
+          m5Ref.current,
+          m5Line1Ref.current,
+          m5Line2Ref.current,
+          m5Line3Ref.current,
+          m5CountRef.current,
+          m5DoorRef.current,
+        ].filter(Boolean) as HTMLElement[];
 
-        /* ─── helper: premium character reveal (customizable per-moment) ─── */
-        function charReveal(
-          el: HTMLElement,
-          trigger: HTMLElement,
-          {
-            start = "top 78%",
-            stagger = 0.018,
-            duration = 0.7,
-            fromVars = {},
-            ease = "power3.out",
-            onComplete,
-          }: {
-            start?: string;
-            stagger?: number;
-            duration?: number;
-            fromVars?: gsap.TweenVars;
-            ease?: string;
-            onComplete?: () => void;
-          } = {}
-        ) {
-          const split = new SplitText(el, { type: "chars" });
-          const base = {
-            opacity: 0,
-            y: 30,
-            filter: "blur(8px)",
-            letterSpacing: "0.12em",
-          };
-          const from = { ...base, ...fromVars };
-          gsap.set(split.chars, from);
-
-          ScrollTrigger.create({
-            trigger,
-            start,
-            onEnter: () => {
-              gsap.to(split.chars, {
-                opacity: 1,
-                y: 0,
-                rotateX: 0,
-                filter: "blur(0px)",
-                letterSpacing: "0em",
-                duration,
-                stagger,
-                ease,
-                onComplete,
-              });
-            },
-            onLeaveBack: () => {
-              gsap.to(split.chars, {
-                ...from,
-                duration: 0.4,
-                stagger: { each: stagger * 0.5, from: "end" },
-                ease: "power2.in",
-              });
-            },
-          });
-          return split;
-        }
-
-        /* ─── helper: word reveal (for body text), with tracking-in ─── */
-        function wordReveal(
-          el: HTMLElement,
-          trigger: HTMLElement,
-          {
-            start = "top 80%",
-            stagger = 0.03,
-            duration = 0.6,
-            delay = 0,
-            trackingFrom = "0.02em",
-          }: {
-            start?: string;
-            stagger?: number;
-            duration?: number;
-            delay?: number;
-            trackingFrom?: string;
-          } = {}
-        ) {
-          const split = new SplitText(el, { type: "words" });
-          gsap.set(split.words, {
-            opacity: 0,
-            y: 18,
-            filter: "blur(4px)",
-            letterSpacing: trackingFrom,
-          });
-          ScrollTrigger.create({
-            trigger,
-            start,
-            onEnter: () => {
-              gsap.to(split.words, {
-                opacity: 1,
-                y: 0,
-                filter: "blur(0px)",
-                letterSpacing: "0em",
-                duration,
-                delay,
-                stagger,
-                ease: "power2.out",
-              });
-            },
-            onLeaveBack: () => {
-              gsap.to(split.words, {
-                opacity: 0,
-                y: 18,
-                filter: "blur(4px)",
-                letterSpacing: trackingFrom,
-                duration: 0.35,
-                stagger: { each: stagger * 0.5, from: "end" },
-                ease: "power2.in",
-              });
-            },
-          });
-          return split;
-        }
-
-        /* ─── helper: slow ambient "breathing" scale, gated to when a
-             trigger section is in view — never fights another scale tween
-             since it targets a wrapping wrapper element, not the same node
-             a scroll-scrubbed tween is driving ─── */
-        function breathe(el: HTMLElement, trigger: HTMLElement, start = "top 60%") {
-          let tween: gsap.core.Tween | null = null;
-          ScrollTrigger.create({
-            trigger,
-            start,
-            end: "bottom top",
-            onEnter: () => {
-              tween = gsap.to(el, {
-                scale: 1.01,
-                duration: 6,
-                ease: "sine.inOut",
-                yoyo: true,
-                repeat: -1,
-              });
-            },
-            onLeave: () => tween?.kill(),
-            onEnterBack: () => {
-              tween = gsap.to(el, {
-                scale: 1.01,
-                duration: 6,
-                ease: "sine.inOut",
-                yoyo: true,
-                repeat: -1,
-              });
-            },
-            onLeaveBack: () => tween?.kill(),
-          });
-        }
-
-        const splits: { revert: () => void }[] = [];
+        gsap.set(allAnimatedEls, { willChange: "transform, opacity, filter" });
 
         /* ════════════════════════════════════════════
-           GLOBAL — every section gets the camera move
+           HELPER — one timeline per section, wired to
+           a single ScrollTrigger. Enter plays it forward,
+           scrolling back up reverses it. Nothing chains
+           beyond this.
         ════════════════════════════════════════════ */
-        [m1Ref, m2Ref, m3Ref, m4Ref, m5Ref].forEach((ref) => {
-          if (ref.current) cameraReveal(ref.current, ref.current);
-        });
+        function createSectionTimeline(
+          sectionEl: HTMLElement,
+          build: (tl: gsap.core.Timeline) => void,
+          start = "top 70%"
+        ) {
+          const tl = gsap.timeline({ paused: true });
+          tl.fromTo(sectionEl, SECTION_HIDDEN, SECTION_VISIBLE, 0);
+          build(tl);
+
+          ScrollTrigger.create({
+            trigger: sectionEl,
+            start,
+            markers: false,
+            once: false,
+            onEnter: () => tl.play(),
+            onLeaveBack: () => tl.reverse(),
+          });
+
+          return tl;
+        }
 
         /* ════════════════════════════════════════════
            MOMENT 1 — Opening statement
-           "AN ANCIENT INSCRIPTION BEING UNCOVERED"
         ════════════════════════════════════════════ */
-        if (m1SpotRef.current && m1Ref.current) {
-          gsap.set(m1SpotRef.current, { opacity: 0, scale: 0.7 });
-          ScrollTrigger.create({
-            trigger: m1Ref.current,
-            start: "top 85%",
-            onEnter: () => {
-              gsap.to(m1SpotRef.current!, {
-                opacity: 1,
-                scale: 1,
-                duration: 2.2,
-                ease: "power2.out",
-              });
+        if (m1Ref.current) {
+          createSectionTimeline(
+            m1Ref.current,
+            (tl) => {
+              if (m1Line1Ref.current) {
+                tl.fromTo(m1Line1Ref.current, BLOCK_HIDDEN, BLOCK_VISIBLE, 0.1);
+              }
+              if (m1Line2Ref.current) {
+                tl.fromTo(m1Line2Ref.current, BLOCK_HIDDEN, BLOCK_VISIBLE, 0.3);
+              }
+              if (m1MetaRef.current) {
+                tl.fromTo(m1MetaRef.current, META_HIDDEN, META_VISIBLE, 0.7);
+              }
+              if (spotRef.current) {
+                tl.fromTo(
+                  spotRef.current,
+                  { opacity: 0.08 },
+                  { opacity: 0.14, duration: 1.6, ease: "power2.inOut" },
+                  0.2
+                );
+              }
             },
-            onLeaveBack: () => {
-              gsap.to(m1SpotRef.current!, { opacity: 0, scale: 0.7, duration: 0.8, ease: "power2.in" });
-            },
-          });
-        }
-        if (m1Line1Ref.current && m1Ref.current) {
-          splits.push(
-            charReveal(m1Line1Ref.current, m1Ref.current, {
-              start: "top 68%",
-              stagger: 0.028,
-              duration: 1.1,
-              ease: "power4.out",
-              fromVars: { y: 80, rotateX: 30, filter: "blur(15px)", transformPerspective: 700, transformOrigin: "50% 100%" },
-            })
+            "top 82%"
           );
         }
-        if (m1Line2Ref.current && m1Ref.current) {
-          splits.push(
-            charReveal(m1Line2Ref.current, m1Ref.current, {
-              start: "top 56%",
-              stagger: 0.024,
-              duration: 1.1,
-              ease: "power4.out",
-              fromVars: { y: 80, rotateX: 30, filter: "blur(15px)", transformPerspective: 700, transformOrigin: "50% 100%" },
-            })
-          );
-        }
-        if (m1MetaRef.current && m1Ref.current) {
-          gsap.set(m1MetaRef.current, { opacity: 0, y: 12 });
-          ScrollTrigger.create({
-            trigger: m1Ref.current,
-            start: "top 46%",
-            onEnter: () => {
-              gsap.to(m1MetaRef.current!, { opacity: 0.5, y: 0, duration: 1, ease: "power2.out" });
-            },
-            onLeaveBack: () => {
-              gsap.to(m1MetaRef.current!, { opacity: 0, y: 12, duration: 0.5, ease: "power2.in" });
-            },
-          });
-        }
-        if (m1Line1Ref.current) breathe(m1Line1Ref.current, m1Ref.current!, "top 40%");
-        if (m1Line2Ref.current) breathe(m1Line2Ref.current, m1Ref.current!, "top 30%");
 
         /* ════════════════════════════════════════════
-           MOMENT 2 — Reframing, three chapter-title lines
+           MOMENT 2 — Reframing
+           Three complete sentences, staggered by beat.
         ════════════════════════════════════════════ */
-        if (m2Line1Ref.current && m2Ref.current) {
-          splits.push(
-            charReveal(m2Line1Ref.current, m2Ref.current, {
-              start: "top 75%",
-              stagger: 0.022,
-              duration: 1.0,
-              ease: "power4.out",
-              fromVars: { y: 40, filter: "blur(12px)" },
-            })
-          );
-        }
-        if (m2Line2Ref.current && m2Ref.current) {
-          splits.push(
-            charReveal(m2Line2Ref.current, m2Ref.current, {
-              start: "top 63%",
-              stagger: 0.018,
-              duration: 0.85,
-              ease: "power4.out",
-              fromVars: { y: 34, filter: "blur(10px)" },
-            })
-          );
-        }
-        if (m2Line3Ref.current && m2Ref.current) {
-          splits.push(
-            charReveal(m2Line3Ref.current, m2Ref.current, {
-              start: "top 51%",
-              stagger: 0.02,
-              duration: 0.95,
-              ease: "power4.out",
-              fromVars: { y: 46, filter: "blur(14px)", scale: 0.94 },
-              onComplete: () => {
-                // subtle brightness pulse — never a flash
-                gsap.to(m2Line3Ref.current!, {
-                  opacity: 0.85,
-                  duration: 0.35,
-                  ease: "power1.inOut",
-                  yoyo: true,
-                  repeat: 1,
-                });
-              },
-            })
-          );
-        }
-        if (m2Line3Ref.current) breathe(m2Line3Ref.current, m2Ref.current!, "top 35%");
-
-        /* ════════════════════════════════════════════
-           MOMENT 3 — Museum plaque
-           rule expands → sentence one → pause → sentence two
-        ════════════════════════════════════════════ */
-        if (m3RuleRef.current && m3Ref.current) {
-          gsap.set(m3RuleRef.current, { scaleX: 0 });
-          ScrollTrigger.create({
-            trigger: m3Ref.current,
-            start: "top 70%",
-            onEnter: () => {
-              gsap.to(m3RuleRef.current!, {
-                scaleX: 1,
-                duration: 1.4,
-                ease: "power3.inOut",
-              });
-            },
-            onLeaveBack: () => {
-              gsap.to(m3RuleRef.current!, { scaleX: 0, duration: 0.6, ease: "power2.in" });
-            },
+        if (m2Ref.current) {
+          createSectionTimeline(m2Ref.current, (tl) => {
+            if (m2Line1Ref.current) {
+              tl.fromTo(m2Line1Ref.current, BLOCK_HIDDEN, BLOCK_VISIBLE, 0.1);
+            }
+            if (m2Line2Ref.current) {
+              tl.fromTo(m2Line2Ref.current, BLOCK_HIDDEN, BLOCK_VISIBLE, 0.32);
+            }
+            if (m2Line3Ref.current) {
+              tl.fromTo(m2Line3Ref.current, BLOCK_HIDDEN, BLOCK_VISIBLE, 0.54);
+            }
           });
         }
-        if (m3Para1Ref.current && m3Ref.current) {
-          splits.push(
-            wordReveal(m3Para1Ref.current, m3Ref.current, {
-              start: "top 62%",
-              stagger: 0.028,
-              duration: 0.65,
-              trackingFrom: "0.05em",
-            })
-          );
-        }
-        if (m3Para2Ref.current && m3Ref.current) {
-          splits.push(
-            wordReveal(m3Para2Ref.current, m3Ref.current, {
-              start: "top 46%",
-              stagger: 0.035,
-              duration: 0.7,
-              delay: 0.35,
-              trackingFrom: "0.05em",
-            })
-          );
+
+        /* ════════════════════════════════════════════
+           MOMENT 3 — Elegant paragraph (museum plaque)
+           Bronze line expands → each line rises out of
+           a masked container, top to bottom.
+        ════════════════════════════════════════════ */
+        if (m3Ref.current) {
+          createSectionTimeline(m3Ref.current, (tl) => {
+            if (m3RuleRef.current) {
+              tl.fromTo(
+                m3RuleRef.current,
+                { scaleX: 0, opacity: 0 },
+                { scaleX: 1, opacity: 0.3, duration: 1.3, ease: "expo.out" },
+                0
+              );
+            }
+            if (m3Para1InnerRef.current) {
+              tl.fromTo(
+                m3Para1InnerRef.current,
+                { yPercent: 100 },
+                { yPercent: 0, duration: 1.2, ease: "expo.out" },
+                0.35
+              );
+            }
+            if (m3Para1Line2InnerRef.current) {
+              tl.fromTo(
+                m3Para1Line2InnerRef.current,
+                { yPercent: 100 },
+                { yPercent: 0, duration: 1.2, ease: "expo.out" },
+                0.5
+              );
+            }
+            if (m3Para2InnerRef.current) {
+              tl.fromTo(
+                m3Para2InnerRef.current,
+                { yPercent: 100 },
+                { yPercent: 0, duration: 1.2, ease: "expo.out" },
+                0.7
+              );
+            }
+            if (m3AttribRef.current) {
+              tl.fromTo(m3AttribRef.current, META_HIDDEN, META_VISIBLE, 0.95);
+            }
+          });
         }
 
         /* ════════════════════════════════════════════
            MOMENT 4 — Monument word: INGENUITY
-           "carved from stone" · camera push · dim world
+           The word is one indivisible unit. It fades
+           from darkness, rises, and settles — then a
+           single bronze sweep of light crosses it once.
         ════════════════════════════════════════════ */
-        if (m4DimRef.current && m4Ref.current) {
-          gsap.set(m4DimRef.current, { opacity: 0 });
-          ScrollTrigger.create({
-            trigger: m4Ref.current,
-            start: "top 60%",
-            onEnter: () => gsap.to(m4DimRef.current!, { opacity: 0.35, duration: 1.4, ease: "power2.out" }),
-            onLeaveBack: () => gsap.to(m4DimRef.current!, { opacity: 0, duration: 0.6, ease: "power2.in" }),
-          });
-        }
-        if (m4WordRef.current && m4Ref.current) {
-          const bigSplit = new SplitText(m4WordRef.current, { type: "chars" });
-          splits.push(bigSplit);
-          gsap.set(bigSplit.chars, {
-            opacity: 0,
-            y: 100,
-            scale: 0.85,
-            filter: "blur(20px)",
-            letterSpacing: "0.2em",
-          });
-
-          // Scrubbed parallax — the word scales subtly as user scrolls through (camera push)
-          gsap.fromTo(
-            m4WordRef.current,
-            { scale: 0.98 },
-            {
-              scale: 1.05,
-              ease: "none",
-              scrollTrigger: {
-                trigger: m4Ref.current,
-                start: "top bottom",
-                end: "bottom top",
-                scrub: 1.5,
-              },
-            }
+        if (m4Ref.current) {
+          createSectionTimeline(
+            m4Ref.current,
+            (tl) => {
+              if (m4WordRef.current) {
+                tl.fromTo(
+                  m4WordRef.current,
+                  { opacity: 0, scale: 0.92, filter: "blur(20px)", y: 40 },
+                  {
+                    opacity: 1,
+                    scale: 1,
+                    filter: "blur(0px)",
+                    y: 0,
+                    duration: 1.5,
+                    ease: "expo.out",
+                  },
+                  0.1
+                );
+              }
+              if (m4SweepRef.current) {
+                tl.fromTo(
+                  m4SweepRef.current,
+                  { x: "-100%", opacity: 1 },
+                  { x: "200%", duration: 2.2, ease: "power2.inOut" },
+                  "+=0.15"
+                );
+              }
+              if (m4SubRef.current) {
+                tl.fromTo(m4SubRef.current, BLOCK_HIDDEN, BLOCK_VISIBLE, 0.6);
+              }
+              if (m4TaxRef.current) {
+                tl.fromTo(m4TaxRef.current, META_HIDDEN, META_VISIBLE, 0.85);
+              }
+            },
+            "top 75%"
           );
-
-          ScrollTrigger.create({
-            trigger: m4Ref.current,
-            start: "top 65%",
-            onEnter: () => {
-              gsap.to(bigSplit.chars, {
-                opacity: 1,
-                y: 0,
-                scale: 1,
-                filter: "blur(0px)",
-                letterSpacing: "0.06em",
-                duration: 2,
-                stagger: 0.045,
-                ease: "power4.out",
-                onComplete: () => {
-                  // signature effect: bronze light sweep, once, no glow
-                  if (m4SweepRef.current) {
-                    gsap.fromTo(
-                      m4SweepRef.current,
-                      { xPercent: -130, opacity: 0 },
-                      {
-                        xPercent: 130,
-                        opacity: 1,
-                        duration: 2.5,
-                        ease: "power1.inOut",
-                        onComplete: () => gsap.set(m4SweepRef.current!, { opacity: 0 }),
-                      }
-                    );
-                  }
-                },
-              });
-            },
-            onLeaveBack: () => {
-              gsap.to(bigSplit.chars, {
-                opacity: 0,
-                y: 100,
-                scale: 0.85,
-                filter: "blur(20px)",
-                letterSpacing: "0.2em",
-                duration: 0.6,
-                stagger: { each: 0.02, from: "end" },
-                ease: "power2.in",
-              });
-              if (m4SweepRef.current) gsap.set(m4SweepRef.current, { opacity: 0, xPercent: -130 });
-            },
-          });
-        }
-        if (m4SubRef.current && m4Ref.current) {
-          gsap.set(m4SubRef.current, { opacity: 0, y: 20 });
-          ScrollTrigger.create({
-            trigger: m4Ref.current,
-            start: "top 45%",
-            onEnter: () => {
-              gsap.to(m4SubRef.current!, { opacity: 0.55, y: 0, duration: 0.9, ease: "power2.out" });
-            },
-            onLeaveBack: () => {
-              gsap.to(m4SubRef.current!, { opacity: 0, y: 20, duration: 0.4, ease: "power2.in" });
-            },
-          });
-        }
-        if (m4TaxRef.current && m4Ref.current) {
-          gsap.set(m4TaxRef.current, { opacity: 0 });
-          ScrollTrigger.create({
-            trigger: m4Ref.current,
-            start: "top 40%",
-            onEnter: () => {
-              gsap.to(m4TaxRef.current!, { opacity: 1, duration: 1.2, ease: "power2.out" });
-            },
-            onLeaveBack: () => {
-              gsap.to(m4TaxRef.current!, { opacity: 0, duration: 0.5, ease: "power2.in" });
-            },
-          });
         }
 
         /* ════════════════════════════════════════════
            MOMENT 5 — The archive doorway
-           door line grows → THE ARCHIVE → AWAITS → metadata
         ════════════════════════════════════════════ */
-        if (m5DoorRef.current && m5Ref.current) {
-          gsap.set(m5DoorRef.current, { scaleY: 0 });
-          ScrollTrigger.create({
-            trigger: m5Ref.current,
-            start: "top 74%",
-            onEnter: () => {
-              gsap.to(m5DoorRef.current!, { scaleY: 1, duration: 1.6, ease: "power3.inOut" });
-            },
-            onLeaveBack: () => {
-              gsap.to(m5DoorRef.current!, { scaleY: 0, duration: 0.6, ease: "power2.in" });
-            },
+        if (m5Ref.current) {
+          createSectionTimeline(m5Ref.current, (tl) => {
+            if (m5DoorRef.current) {
+              tl.fromTo(
+                m5DoorRef.current,
+                { scaleY: 0 },
+                { scaleY: 1, duration: 1.3, ease: "expo.out" },
+                0.1
+              );
+            }
+            if (m5Line1Ref.current) {
+              tl.fromTo(m5Line1Ref.current, BLOCK_HIDDEN, BLOCK_VISIBLE, 0.3);
+            }
+            if (m5Line2Ref.current) {
+              tl.fromTo(m5Line2Ref.current, BLOCK_HIDDEN, BLOCK_VISIBLE, 0.5);
+            }
+            if (m5CountRef.current) {
+              tl.fromTo(m5CountRef.current, META_HIDDEN, META_VISIBLE, 0.8);
+            }
+            if (m5Line3Ref.current) {
+              tl.fromTo(
+                m5Line3Ref.current,
+                { opacity: 0, y: 16 },
+                { opacity: 0.45, y: 0, duration: 1, ease: "expo.out" },
+                1.0
+              );
+            }
           });
         }
-        if (m5Line1Ref.current && m5Ref.current) {
-          splits.push(
-            charReveal(m5Line1Ref.current, m5Ref.current, {
-              start: "top 64%",
-              stagger: 0.024,
-              duration: 1.0,
-              ease: "power4.out",
-              fromVars: { y: 50, filter: "blur(12px)" },
-            })
-          );
-        }
-        if (m5Line2Ref.current && m5Ref.current) {
-          splits.push(
-            charReveal(m5Line2Ref.current, m5Ref.current, {
-              start: "top 54%",
-              stagger: 0.02,
-              duration: 0.9,
-              ease: "power4.out",
-              fromVars: { y: 40, filter: "blur(10px)" },
-            })
-          );
-        }
-        if (m5CountRef.current && m5Ref.current) {
-          gsap.set(m5CountRef.current, { opacity: 0, y: 14 });
-          ScrollTrigger.create({
-            trigger: m5Ref.current,
-            start: "top 40%",
-            onEnter: () => {
-              gsap.to(m5CountRef.current!, { opacity: 0.6, y: 0, duration: 0.8, ease: "power2.out" });
-            },
-            onLeaveBack: () => {
-              gsap.to(m5CountRef.current!, { opacity: 0, y: 14, duration: 0.4, ease: "power2.in" });
-            },
-          });
-        }
-        if (m5Line3Ref.current && m5Ref.current) {
-          splits.push(
-            charReveal(m5Line3Ref.current, m5Ref.current, {
-              start: "top 32%",
-              stagger: 0.015,
-              duration: 0.6,
-              fromVars: { y: 14, filter: "blur(6px)", letterSpacing: "0.5em" },
-            })
-          );
-        }
-        if (m5Line1Ref.current) breathe(m5Line1Ref.current, m5Ref.current!, "top 30%");
 
         /* ════════════════════════════════════════════
-           AMBIENT — warm spotlight drift
+           MICRO MOTION — ambient only, never text.
+           Light drifts, grain flickers, dust rises.
+           Once a sentence lands it does not move again.
         ════════════════════════════════════════════ */
         if (spotRef.current) {
           gsap.to(spotRef.current, {
@@ -624,39 +394,33 @@ export default function TechnologyIntro() {
           });
         }
 
-        /* ─── film grain — slow, subtle drift, never still ─── */
-        if (grainRef.current) {
-          gsap.to(grainRef.current, {
-            backgroundPosition: "137px 91px",
-            duration: 9,
-            ease: "none",
-            repeat: -1,
-            yoyo: true,
-          });
+        if (dustRef.current) {
+          const dustEls = dustRef.current.children;
+          for (let i = 0; i < dustEls.length; i++) {
+            const p = DUST_PARTICLES[i];
+            const el = dustEls[i] as HTMLElement;
+            gsap.to(el, {
+              y: `-=${p.driftY}`,
+              x: `+=${p.driftX}`,
+              opacity: 0,
+              duration: p.dur,
+              ease: "none",
+              repeat: -1,
+              delay: p.del,
+            });
+          }
         }
 
-        /* ─── dust motes — tiny, slow, independent drifting ─── */
-        gsap.utils.toArray<HTMLElement>(".dust-mote").forEach((mote, i) => {
-          gsap.to(mote, {
-            y: i % 2 === 0 ? -16 : 16,
-            x: i % 3 === 0 ? 8 : -8,
-            opacity: 0.5,
-            duration: 6 + i,
-            ease: "sine.inOut",
-            yoyo: true,
-            repeat: -1,
-            delay: i * 0.4,
-          });
-        });
-
-        return () => {
-          splits.forEach((s) => s.revert());
-        };
+        /* Layout can shift once fonts/images settle in — resync ScrollTrigger */
+        ScrollTrigger.refresh();
       }, wrapRef);
 
-      return () => ctx.revert();
+      return () => {
+        ctx.revert();
+        ScrollTrigger.refresh();
+      };
     },
-    { scope: wrapRef }
+    { scope: wrapRef, dependencies: [isReady] }
   );
 
   /* ════════════════════════════════════════════════════════════════
@@ -678,40 +442,48 @@ export default function TechnologyIntro() {
         }}
       />
 
-      {/* ─── Film grain — barely-there texture, always in motion ─── */}
-      <div
+      {/* ─── Film grain canvas ─── */}
+      <canvas
         ref={grainRef}
         className="pointer-events-none"
         style={{
           position: "fixed",
           inset: 0,
           zIndex: 2,
-          opacity: 0.035,
+          width: "100%",
+          height: "100%",
+          opacity: 0.35,
           mixBlendMode: "overlay",
-          backgroundImage:
-            "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
-          backgroundRepeat: "repeat",
         }}
       />
 
-      {/* ─── Dust motes — ambient, fixed positions, slow independent drift ─── */}
-      {DUST.map((d, i) => (
-        <div
-          key={i}
-          className="dust-mote pointer-events-none"
-          style={{
-            position: "fixed",
-            top: d.top,
-            left: d.left,
-            width: d.size,
-            height: d.size,
-            borderRadius: "50%",
-            background: BRONZE,
-            opacity: 0.25,
-            zIndex: 2,
-          }}
-        />
-      ))}
+      {/* ─── Dust particles ─── */}
+      <div
+        ref={dustRef}
+        className="pointer-events-none"
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 1,
+          overflow: "hidden",
+        }}
+      >
+        {DUST_PARTICLES.map((p, i) => (
+          <div
+            key={i}
+            style={{
+              position: "absolute",
+              width: p.w,
+              height: p.h,
+              borderRadius: "50%",
+              background: BRONZE,
+              opacity: p.opacity,
+              left: `${p.left}%`,
+              top: `${p.top}%`,
+            }}
+          />
+        ))}
+      </div>
 
       {/* ─── Thin vertical grid rule (left) ─── */}
       <div
@@ -743,7 +515,7 @@ export default function TechnologyIntro() {
       />
 
       {/* ════════════════════════════════════════════
-         MOMENT 1 — WE DID NOT INVENT TOOLS
+         MOMENT 1 — BEFORE THERE WERE MACHINES
       ════════════════════════════════════════════ */}
       <section
         ref={m1Ref}
@@ -757,19 +529,6 @@ export default function TechnologyIntro() {
           padding: "60px 40px",
         }}
       >
-        {/* Soft warm spotlight passing behind the inscription */}
-        <div
-          ref={m1SpotRef}
-          className="pointer-events-none"
-          style={{
-            position: "absolute",
-            inset: 0,
-            background:
-              "radial-gradient(ellipse 600px 400px at 50% 45%, rgba(176,141,87,0.16) 0%, transparent 72%)",
-            zIndex: 0,
-          }}
-        />
-
         {/* Corner metadata */}
         <div
           style={{
@@ -810,7 +569,6 @@ export default function TechnologyIntro() {
             color: STONE,
             textAlign: "center",
             letterSpacing: "-0.02em",
-            perspective: 700,
           }}
         >
           BEFORE THERE WERE MACHINES
@@ -826,7 +584,6 @@ export default function TechnologyIntro() {
             textAlign: "center",
             letterSpacing: "-0.02em",
             marginTop: "0.08em",
-            perspective: 700,
           }}
         >
           THERE WERE QUESTIONS
@@ -951,7 +708,6 @@ export default function TechnologyIntro() {
         />
 
         <div
-          ref={m3Para1Ref}
           style={{
             fontFamily: "var(--font-body), system-ui, sans-serif",
             fontSize: "clamp(16px, 2.2vw, 24px)",
@@ -962,13 +718,19 @@ export default function TechnologyIntro() {
             letterSpacing: "0.01em",
           }}
         >
-          Time forgets many things.
-          <br />
-          But every invention is a message sent forward.
+          <span style={{ display: "block", overflow: "hidden" }}>
+            <span ref={m3Para1InnerRef} style={{ display: "block" }}>
+              Time forgets many things.
+            </span>
+          </span>
+          <span style={{ display: "block", overflow: "hidden" }}>
+            <span ref={m3Para1Line2InnerRef} style={{ display: "block" }}>
+              But every invention is a message sent forward.
+            </span>
+          </span>
         </div>
 
         <div
-          ref={m3Para2Ref}
           style={{
             fontFamily: "var(--font-body), system-ui, sans-serif",
             fontSize: "clamp(17px, 2.4vw, 26px)",
@@ -981,11 +743,16 @@ export default function TechnologyIntro() {
             fontWeight: 500,
           }}
         >
-          A conversation between generations.
+          <span style={{ display: "block", overflow: "hidden" }}>
+            <span ref={m3Para2InnerRef} style={{ display: "block" }}>
+              A conversation between generations.
+            </span>
+          </span>
         </div>
 
         {/* Subtle attribution */}
         <div
+          ref={m3AttribRef}
           style={{
             fontFamily: "var(--font-mono), monospace",
             fontSize: 8,
@@ -1014,51 +781,34 @@ export default function TechnologyIntro() {
           padding: "60px 40px",
         }}
       >
-        {/* World dims slightly as the monument takes the stage */}
         <div
-          ref={m4DimRef}
-          className="pointer-events-none"
+          ref={m4WordRef}
           style={{
-            position: "absolute",
-            inset: 0,
-            background: INK,
-            zIndex: 0,
+            fontFamily: "var(--font-display), system-ui, sans-serif",
+            fontSize: "clamp(70px, 16vw, 260px)",
+            lineHeight: 0.82,
+            textTransform: "uppercase",
+            color: STONE,
+            textAlign: "center",
+            letterSpacing: "0.06em",
+            position: "relative",
+            overflow: "hidden",
           }}
-        />
-
-        <div
-          ref={m4WordWrapRef}
-          style={{ position: "relative", overflow: "hidden", display: "inline-block", zIndex: 1 }}
         >
-          <div
-            ref={m4WordRef}
-            style={{
-              fontFamily: "var(--font-display), system-ui, sans-serif",
-              fontSize: "clamp(70px, 16vw, 260px)",
-              lineHeight: 0.82,
-              textTransform: "uppercase",
-              color: STONE,
-              textAlign: "center",
-              letterSpacing: "0.06em",
-            }}
-          >
-            INGENUITY
-          </div>
-
-          {/* Signature effect — bronze light sweeping across engraved stone, once */}
+          INGENUITY
+          {/* Bronze light sweep overlay */}
           <div
             ref={m4SweepRef}
             className="pointer-events-none"
             style={{
               position: "absolute",
               top: 0,
-              bottom: 0,
               left: 0,
-              width: "60%",
+              width: "40%",
+              height: "100%",
+              background: `linear-gradient(90deg, transparent 0%, rgba(176,141,87,0.12) 40%, rgba(176,141,87,0.2) 50%, rgba(176,141,87,0.12) 60%, transparent 100%)`,
+              transform: "translateX(-100%)",
               opacity: 0,
-              background:
-                "linear-gradient(115deg, transparent 30%, rgba(176,141,87,0.5) 50%, transparent 70%)",
-              mixBlendMode: "overlay",
             }}
           />
         </div>
@@ -1072,7 +822,6 @@ export default function TechnologyIntro() {
             color: BRONZE,
             marginTop: 40,
             textAlign: "center",
-            zIndex: 1,
           }}
         >
           THE FORCE THAT TURNED IMPOSSIBILITY INTO REALITY
@@ -1087,7 +836,6 @@ export default function TechnologyIntro() {
             marginTop: 64,
             flexWrap: "wrap",
             justifyContent: "center",
-            zIndex: 1,
           }}
         >
           {TAXONOMY.map((label, i) => (

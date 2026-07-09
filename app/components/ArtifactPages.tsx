@@ -95,7 +95,7 @@ const artifacts = [
 /* ════════════════════════════════════════════════════════════════
    SINGLE ARTIFACT SECTION
    ════════════════════════════════════════════════════════════════ */
-function ArtifactSection({ artifact, index }: { artifact: typeof artifacts[0]; index: number }) {
+function ArtifactSection({ artifact, index, isReady }: { artifact: typeof artifacts[0]; index: number; isReady: boolean }) {
   const sectionRef = useRef<HTMLElement>(null);
   const taglineRef = useRef<HTMLDivElement>(null);
   const titleRef = useRef<HTMLDivElement>(null);
@@ -104,9 +104,12 @@ function ArtifactSection({ artifact, index }: { artifact: typeof artifacts[0]; i
   const dividerRef = useRef<HTMLDivElement>(null);
 
   useGSAP(() => {
-    if (!sectionRef.current) return;
+    if (!isReady || !sectionRef.current) return;
 
-    // Tagline letter-by-letter reveal
+    console.log("SCROLL READY");
+
+    const ctx = gsap.context(() => {
+      // Tagline letter-by-letter reveal
     if (taglineRef.current) {
       const split = new SplitText(taglineRef.current, { type: "chars,words" });
       gsap.set(split.chars, { opacity: 0, y: 20 });
@@ -204,7 +207,13 @@ function ArtifactSection({ artifact, index }: { artifact: typeof artifacts[0]; i
       );
     }
 
-  }, { scope: sectionRef });
+    }, sectionRef);
+
+    return () => {
+      ctx.revert();
+      ScrollTrigger.refresh();
+    };
+  }, { scope: sectionRef, dependencies: [isReady] });
 
   // Style variations per artifact type
   const styleMap: Record<string, { accent: string; bg: string }> = {
@@ -378,11 +387,11 @@ function ArtifactSection({ artifact, index }: { artifact: typeof artifacts[0]; i
 /* ════════════════════════════════════════════════════════════════
    EXPORT ALL ARTIFACTS
    ════════════════════════════════════════════════════════════════ */
-export default function ArtifactPages() {
+export default function ArtifactPages({ isReady }: { isReady: boolean }) {
   return (
     <>
       {artifacts.map((artifact, index) => (
-        <ArtifactSection key={artifact.id} artifact={artifact} index={index} />
+        <ArtifactSection key={artifact.id} artifact={artifact} index={index} isReady={isReady} />
       ))}
 
       {/* Final ending */}

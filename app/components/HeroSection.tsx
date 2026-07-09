@@ -197,6 +197,8 @@ export default function HeroSection({ isReady }: HeroSectionProps) {
       )
         return;
 
+      console.log("HERO INITIALIZED");
+
       labelsRef.current = [];
 
       const ctx = gsap.context(() => {
@@ -228,7 +230,10 @@ export default function HeroSection({ isReady }: HeroSectionProps) {
         };
       }, sectionRef);
 
-      return () => ctx.revert();
+      return () => {
+        ctx.revert();
+        ScrollTrigger.refresh();
+      };
     },
     { scope: sectionRef, dependencies: [isReady] }
   );
@@ -305,8 +310,8 @@ export default function HeroSection({ isReady }: HeroSectionProps) {
 
         <div
           ref={lostTechnologyRef}
-          className="absolute right-[4%] bottom-[10%] text-right font-black uppercase leading-[0.8]"
-          style={{ color: STONE, fontSize: "clamp(52px,9.5vw,160px)" }}
+          className="absolute right-[4%] bottom-[10%] text-right font-black uppercase leading-[0.8] whitespace-nowrap"
+          style={{ color: STONE, fontSize: "clamp(50px,8.5vw,160px)" }}
         >
           LOST TECHNOLOGY
         </div>
@@ -328,7 +333,7 @@ export default function HeroSection({ isReady }: HeroSectionProps) {
           className="absolute left-1/2 top-[60%] -translate-x-1/2 -translate-y-1/2 text-center font-black uppercase leading-[0.82]"
           style={{
             color: BRONZE,
-            fontSize: "clamp(40px,7.5vw,130px)",
+            fontSize: "clamp(25px,4.5vw,80px)",
             whiteSpace: "nowrap",
           }}
         >
