@@ -8,9 +8,7 @@ import { useGSAP } from "@gsap/react";
 
 gsap.registerPlugin(ScrollTrigger, SplitText);
 
-/* ════════════════════════════════════════════════════════════════
-   DESIGN TOKENS — shared palette with the rest of the museum
-   ════════════════════════════════════════════════════════════════ */
+
 const INK = "#080604";
 const STONE = "#E8DDC7";
 const STONE_DIM = "rgba(232,221,199,0.44)";
@@ -18,9 +16,7 @@ const BRONZE = "#B08D57";
 const OXIDE = "#527A65";
 const ARCHIVE_RED = "#8B2E2E";
 
-/* ════════════════════════════════════════════════════════════════
-   METADATA LABELS — museum-catalog taxonomy, deliberately quiet
-   ════════════════════════════════════════════════════════════════ */
+
 const TAXONOMY = [
   "FIRE",
   "LANGUAGE",
@@ -124,62 +120,56 @@ export default function TechnologyIntro() {
           });
         }
 
-        /* ─── helper: premium character reveal (customizable per-moment) ─── */
-        function charReveal(
+        /* ─── helper: premium line reveal (editorial style) ─── */
+        function lineReveal(
           el: HTMLElement,
           trigger: HTMLElement,
           {
             start = "top 78%",
-            stagger = 0.018,
-            duration = 0.7,
+            duration = 0.9,
             fromVars = {},
-            ease = "power3.out",
+            ease = "power4.out",
             onComplete,
           }: {
             start?: string;
-            stagger?: number;
             duration?: number;
             fromVars?: gsap.TweenVars;
             ease?: string;
             onComplete?: () => void;
           } = {}
         ) {
-          const split = new SplitText(el, { type: "chars" });
           const base = {
             opacity: 0,
-            y: 30,
-            filter: "blur(8px)",
-            letterSpacing: "0.12em",
+            y: 32,
+            filter: "blur(10px)",
+            scale: 0.985,
           };
           const from = { ...base, ...fromVars };
-          gsap.set(split.chars, from);
+          gsap.set(el, from);
 
           ScrollTrigger.create({
             trigger,
             start,
             onEnter: () => {
-              gsap.to(split.chars, {
+              gsap.to(el, {
                 opacity: 1,
                 y: 0,
-                rotateX: 0,
                 filter: "blur(0px)",
-                letterSpacing: "0em",
+                scale: 1,
                 duration,
-                stagger,
                 ease,
                 onComplete,
               });
             },
             onLeaveBack: () => {
-              gsap.to(split.chars, {
+              gsap.to(el, {
                 ...from,
                 duration: 0.4,
-                stagger: { each: stagger * 0.5, from: "end" },
                 ease: "power2.in",
               });
             },
           });
-          return split;
+          return { revert: () => { } };
         }
 
         /* ─── helper: word reveal (for body text), with tracking-in ─── */
@@ -303,23 +293,19 @@ export default function TechnologyIntro() {
         }
         if (m1Line1Ref.current && m1Ref.current) {
           splits.push(
-            charReveal(m1Line1Ref.current, m1Ref.current, {
+            lineReveal(m1Line1Ref.current, m1Ref.current, {
               start: "top 68%",
-              stagger: 0.028,
               duration: 1.1,
-              ease: "power4.out",
-              fromVars: { y: 80, rotateX: 30, filter: "blur(15px)", transformPerspective: 700, transformOrigin: "50% 100%" },
+              fromVars: { y: 32, filter: "blur(10px)" },
             })
           );
         }
         if (m1Line2Ref.current && m1Ref.current) {
           splits.push(
-            charReveal(m1Line2Ref.current, m1Ref.current, {
+            lineReveal(m1Line2Ref.current, m1Ref.current, {
               start: "top 56%",
-              stagger: 0.024,
               duration: 1.1,
-              ease: "power4.out",
-              fromVars: { y: 80, rotateX: 30, filter: "blur(15px)", transformPerspective: 700, transformOrigin: "50% 100%" },
+              fromVars: { y: 32, filter: "blur(10px)" },
             })
           );
         }
@@ -344,34 +330,28 @@ export default function TechnologyIntro() {
         ════════════════════════════════════════════ */
         if (m2Line1Ref.current && m2Ref.current) {
           splits.push(
-            charReveal(m2Line1Ref.current, m2Ref.current, {
+            lineReveal(m2Line1Ref.current, m2Ref.current, {
               start: "top 75%",
-              stagger: 0.022,
               duration: 1.0,
-              ease: "power4.out",
-              fromVars: { y: 40, filter: "blur(12px)" },
+              fromVars: { y: 32, filter: "blur(10px)" },
             })
           );
         }
         if (m2Line2Ref.current && m2Ref.current) {
           splits.push(
-            charReveal(m2Line2Ref.current, m2Ref.current, {
+            lineReveal(m2Line2Ref.current, m2Ref.current, {
               start: "top 63%",
-              stagger: 0.018,
               duration: 0.85,
-              ease: "power4.out",
-              fromVars: { y: 34, filter: "blur(10px)" },
+              fromVars: { y: 32, filter: "blur(10px)" },
             })
           );
         }
         if (m2Line3Ref.current && m2Ref.current) {
           splits.push(
-            charReveal(m2Line3Ref.current, m2Ref.current, {
+            lineReveal(m2Line3Ref.current, m2Ref.current, {
               start: "top 51%",
-              stagger: 0.02,
               duration: 0.95,
-              ease: "power4.out",
-              fromVars: { y: 46, filter: "blur(14px)", scale: 0.94 },
+              fromVars: { y: 32, filter: "blur(10px)" },
               onComplete: () => {
                 // subtle brightness pulse — never a flash
                 gsap.to(m2Line3Ref.current!, {
@@ -444,19 +424,16 @@ export default function TechnologyIntro() {
           });
         }
         if (m4WordRef.current && m4Ref.current) {
-          const bigSplit = new SplitText(m4WordRef.current, { type: "chars" });
-          splits.push(bigSplit);
-          gsap.set(bigSplit.chars, {
+          gsap.set(m4WordRef.current, {
             opacity: 0,
-            y: 100,
-            scale: 0.85,
-            filter: "blur(20px)",
-            letterSpacing: "0.2em",
+            y: 32,
+            scale: 0.985,
+            filter: "blur(10px)",
           });
 
           // Scrubbed parallax — the word scales subtly as user scrolls through (camera push)
           gsap.fromTo(
-            m4WordRef.current,
+            m4WordWrapRef.current,
             { scale: 0.98 },
             {
               scale: 1.05,
@@ -474,14 +451,12 @@ export default function TechnologyIntro() {
             trigger: m4Ref.current,
             start: "top 65%",
             onEnter: () => {
-              gsap.to(bigSplit.chars, {
+              gsap.to(m4WordRef.current, {
                 opacity: 1,
                 y: 0,
                 scale: 1,
                 filter: "blur(0px)",
-                letterSpacing: "0.06em",
-                duration: 2,
-                stagger: 0.045,
+                duration: 1.1,
                 ease: "power4.out",
                 onComplete: () => {
                   // signature effect: bronze light sweep, once, no glow
@@ -502,14 +477,12 @@ export default function TechnologyIntro() {
               });
             },
             onLeaveBack: () => {
-              gsap.to(bigSplit.chars, {
+              gsap.to(m4WordRef.current, {
                 opacity: 0,
-                y: 100,
-                scale: 0.85,
-                filter: "blur(20px)",
-                letterSpacing: "0.2em",
+                y: 32,
+                scale: 0.985,
+                filter: "blur(10px)",
                 duration: 0.6,
-                stagger: { each: 0.02, from: "end" },
                 ease: "power2.in",
               });
               if (m4SweepRef.current) gsap.set(m4SweepRef.current, { opacity: 0, xPercent: -130 });
@@ -562,23 +535,19 @@ export default function TechnologyIntro() {
         }
         if (m5Line1Ref.current && m5Ref.current) {
           splits.push(
-            charReveal(m5Line1Ref.current, m5Ref.current, {
+            lineReveal(m5Line1Ref.current, m5Ref.current, {
               start: "top 64%",
-              stagger: 0.024,
               duration: 1.0,
-              ease: "power4.out",
-              fromVars: { y: 50, filter: "blur(12px)" },
+              fromVars: { y: 32, filter: "blur(10px)" },
             })
           );
         }
         if (m5Line2Ref.current && m5Ref.current) {
           splits.push(
-            charReveal(m5Line2Ref.current, m5Ref.current, {
+            lineReveal(m5Line2Ref.current, m5Ref.current, {
               start: "top 54%",
-              stagger: 0.02,
               duration: 0.9,
-              ease: "power4.out",
-              fromVars: { y: 40, filter: "blur(10px)" },
+              fromVars: { y: 32, filter: "blur(10px)" },
             })
           );
         }
@@ -597,11 +566,10 @@ export default function TechnologyIntro() {
         }
         if (m5Line3Ref.current && m5Ref.current) {
           splits.push(
-            charReveal(m5Line3Ref.current, m5Ref.current, {
+            lineReveal(m5Line3Ref.current, m5Ref.current, {
               start: "top 32%",
-              stagger: 0.015,
               duration: 0.6,
-              fromVars: { y: 14, filter: "blur(6px)", letterSpacing: "0.5em" },
+              fromVars: { y: 14, filter: "blur(6px)" },
             })
           );
         }
