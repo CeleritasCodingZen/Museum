@@ -26,8 +26,19 @@ const TAXONOMY = [
   "LANGUAGE",
   "TOOLS",
   "MATHEMATICS",
+
   "ASTRONOMY",
   "COMPUTATION",
+];
+
+/* Fixed positions for ambient dust motes — deliberate, not random-on-every-render */
+const DUST = [
+  { top: "18%", left: "22%", size: 2, dur: 9 },
+  { top: "34%", left: "78%", size: 1.5, dur: 11 },
+  { top: "62%", left: "14%", size: 2, dur: 13 },
+  { top: "72%", left: "84%", size: 1.5, dur: 10 },
+  { top: "48%", left: "50%", size: 1, dur: 14 },
+  { top: "12%", left: "60%", size: 1.5, dur: 8 },
 ];
 
 /* ════════════════════════════════════════════════════════════════
@@ -41,6 +52,7 @@ export default function TechnologyIntro() {
   const m1Line1Ref = useRef<HTMLDivElement>(null);
   const m1Line2Ref = useRef<HTMLDivElement>(null);
   const m1MetaRef = useRef<HTMLDivElement>(null);
+  const m1SpotRef = useRef<HTMLDivElement>(null);
 
   const m2Ref = useRef<HTMLDivElement>(null);
   const m2Line1Ref = useRef<HTMLDivElement>(null);
@@ -53,9 +65,12 @@ export default function TechnologyIntro() {
   const m3RuleRef = useRef<HTMLDivElement>(null);
 
   const m4Ref = useRef<HTMLDivElement>(null);
+  const m4WordWrapRef = useRef<HTMLDivElement>(null);
   const m4WordRef = useRef<HTMLDivElement>(null);
+  const m4SweepRef = useRef<HTMLDivElement>(null);
   const m4SubRef = useRef<HTMLDivElement>(null);
   const m4TaxRef = useRef<HTMLDivElement>(null);
+  const m4DimRef = useRef<HTMLDivElement>(null);
 
   const m5Ref = useRef<HTMLDivElement>(null);
   const m5Line1Ref = useRef<HTMLDivElement>(null);
@@ -64,8 +79,9 @@ export default function TechnologyIntro() {
   const m5CountRef = useRef<HTMLDivElement>(null);
   const m5DoorRef = useRef<HTMLDivElement>(null);
 
-  /* Spotlight ref */
+  /* Spotlight + atmosphere refs */
   const spotRef = useRef<HTMLDivElement>(null);
+  const grainRef = useRef<HTMLDivElement>(null);
 
   /* ──────────── GSAP ORCHESTRATION ──────────── */
   useGSAP(
@@ -73,21 +89,71 @@ export default function TechnologyIntro() {
       if (!wrapRef.current) return;
 
       const ctx = gsap.context(() => {
-        /* ─── helper: premium character reveal ─── */
+        /* ═══════════════════════════════════════════════════════
+           HELPER — cinematic "camera" entrance for a whole section
+           scale 0.96→1 · opacity 0.4→1 · blur(10px)→0 · power4.out
+        ═══════════════════════════════════════════════════════ */
+        function cameraReveal(el: HTMLElement, trigger: HTMLElement, start = "top 82%") {
+          gsap.set(el, {
+            scale: 0.96,
+            opacity: 0.4,
+            filter: "blur(10px)",
+            transformOrigin: "center center",
+          });
+          ScrollTrigger.create({
+            trigger,
+            start,
+            onEnter: () => {
+              gsap.to(el, {
+                scale: 1,
+                opacity: 1,
+                filter: "blur(0px)",
+                duration: 1.6,
+                ease: "power4.out",
+              });
+            },
+            onLeaveBack: () => {
+              gsap.to(el, {
+                scale: 0.96,
+                opacity: 0.4,
+                filter: "blur(10px)",
+                duration: 0.7,
+                ease: "power2.in",
+              });
+            },
+          });
+        }
+
+        /* ─── helper: premium character reveal (customizable per-moment) ─── */
         function charReveal(
           el: HTMLElement,
           trigger: HTMLElement,
-          start = "top 78%",
-          stagger = 0.018,
-          duration = 0.7
+          {
+            start = "top 78%",
+            stagger = 0.018,
+            duration = 0.7,
+            fromVars = {},
+            ease = "power3.out",
+            onComplete,
+          }: {
+            start?: string;
+            stagger?: number;
+            duration?: number;
+            fromVars?: gsap.TweenVars;
+            ease?: string;
+            onComplete?: () => void;
+          } = {}
         ) {
           const split = new SplitText(el, { type: "chars" });
-          gsap.set(split.chars, {
+          const base = {
             opacity: 0,
             y: 30,
             filter: "blur(8px)",
             letterSpacing: "0.12em",
-          });
+          };
+          const from = { ...base, ...fromVars };
+          gsap.set(split.chars, from);
+
           ScrollTrigger.create({
             trigger,
             start,
@@ -95,19 +161,18 @@ export default function TechnologyIntro() {
               gsap.to(split.chars, {
                 opacity: 1,
                 y: 0,
+                rotateX: 0,
                 filter: "blur(0px)",
                 letterSpacing: "0em",
                 duration,
                 stagger,
-                ease: "power3.out",
+                ease,
+                onComplete,
               });
             },
             onLeaveBack: () => {
               gsap.to(split.chars, {
-                opacity: 0,
-                y: 30,
-                filter: "blur(8px)",
-                letterSpacing: "0.12em",
+                ...from,
                 duration: 0.4,
                 stagger: { each: stagger * 0.5, from: "end" },
                 ease: "power2.in",
@@ -117,19 +182,30 @@ export default function TechnologyIntro() {
           return split;
         }
 
-        /* ─── helper: word reveal (for body text) ─── */
+        /* ─── helper: word reveal (for body text), with tracking-in ─── */
         function wordReveal(
           el: HTMLElement,
           trigger: HTMLElement,
-          start = "top 80%",
-          stagger = 0.03,
-          duration = 0.6
+          {
+            start = "top 80%",
+            stagger = 0.03,
+            duration = 0.6,
+            delay = 0,
+            trackingFrom = "0.02em",
+          }: {
+            start?: string;
+            stagger?: number;
+            duration?: number;
+            delay?: number;
+            trackingFrom?: string;
+          } = {}
         ) {
           const split = new SplitText(el, { type: "words" });
           gsap.set(split.words, {
             opacity: 0,
             y: 18,
             filter: "blur(4px)",
+            letterSpacing: trackingFrom,
           });
           ScrollTrigger.create({
             trigger,
@@ -139,7 +215,9 @@ export default function TechnologyIntro() {
                 opacity: 1,
                 y: 0,
                 filter: "blur(0px)",
+                letterSpacing: "0em",
                 duration,
+                delay,
                 stagger,
                 ease: "power2.out",
               });
@@ -149,6 +227,7 @@ export default function TechnologyIntro() {
                 opacity: 0,
                 y: 18,
                 filter: "blur(4px)",
+                letterSpacing: trackingFrom,
                 duration: 0.35,
                 stagger: { each: stagger * 0.5, from: "end" },
                 ease: "power2.in",
@@ -158,21 +237,97 @@ export default function TechnologyIntro() {
           return split;
         }
 
+        /* ─── helper: slow ambient "breathing" scale, gated to when a
+             trigger section is in view — never fights another scale tween
+             since it targets a wrapping wrapper element, not the same node
+             a scroll-scrubbed tween is driving ─── */
+        function breathe(el: HTMLElement, trigger: HTMLElement, start = "top 60%") {
+          let tween: gsap.core.Tween | null = null;
+          ScrollTrigger.create({
+            trigger,
+            start,
+            end: "bottom top",
+            onEnter: () => {
+              tween = gsap.to(el, {
+                scale: 1.01,
+                duration: 6,
+                ease: "sine.inOut",
+                yoyo: true,
+                repeat: -1,
+              });
+            },
+            onLeave: () => tween?.kill(),
+            onEnterBack: () => {
+              tween = gsap.to(el, {
+                scale: 1.01,
+                duration: 6,
+                ease: "sine.inOut",
+                yoyo: true,
+                repeat: -1,
+              });
+            },
+            onLeaveBack: () => tween?.kill(),
+          });
+        }
+
         const splits: { revert: () => void }[] = [];
 
         /* ════════════════════════════════════════════
-           MOMENT 1 — Opening statement
-           "WE DID NOT INVENT TOOLS. WE INVENTED POSSIBILITY."
+           GLOBAL — every section gets the camera move
         ════════════════════════════════════════════ */
-        if (m1Line1Ref.current && m1Line2Ref.current && m1Ref.current) {
-          splits.push(charReveal(m1Line1Ref.current, m1Ref.current, "top 70%", 0.025, 0.8));
-          splits.push(charReveal(m1Line2Ref.current, m1Ref.current, "top 60%", 0.022, 0.8));
+        [m1Ref, m2Ref, m3Ref, m4Ref, m5Ref].forEach((ref) => {
+          if (ref.current) cameraReveal(ref.current, ref.current);
+        });
+
+        /* ════════════════════════════════════════════
+           MOMENT 1 — Opening statement
+           "AN ANCIENT INSCRIPTION BEING UNCOVERED"
+        ════════════════════════════════════════════ */
+        if (m1SpotRef.current && m1Ref.current) {
+          gsap.set(m1SpotRef.current, { opacity: 0, scale: 0.7 });
+          ScrollTrigger.create({
+            trigger: m1Ref.current,
+            start: "top 85%",
+            onEnter: () => {
+              gsap.to(m1SpotRef.current!, {
+                opacity: 1,
+                scale: 1,
+                duration: 2.2,
+                ease: "power2.out",
+              });
+            },
+            onLeaveBack: () => {
+              gsap.to(m1SpotRef.current!, { opacity: 0, scale: 0.7, duration: 0.8, ease: "power2.in" });
+            },
+          });
+        }
+        if (m1Line1Ref.current && m1Ref.current) {
+          splits.push(
+            charReveal(m1Line1Ref.current, m1Ref.current, {
+              start: "top 68%",
+              stagger: 0.028,
+              duration: 1.1,
+              ease: "power4.out",
+              fromVars: { y: 80, rotateX: 30, filter: "blur(15px)", transformPerspective: 700, transformOrigin: "50% 100%" },
+            })
+          );
+        }
+        if (m1Line2Ref.current && m1Ref.current) {
+          splits.push(
+            charReveal(m1Line2Ref.current, m1Ref.current, {
+              start: "top 56%",
+              stagger: 0.024,
+              duration: 1.1,
+              ease: "power4.out",
+              fromVars: { y: 80, rotateX: 30, filter: "blur(15px)", transformPerspective: 700, transformOrigin: "50% 100%" },
+            })
+          );
         }
         if (m1MetaRef.current && m1Ref.current) {
           gsap.set(m1MetaRef.current, { opacity: 0, y: 12 });
           ScrollTrigger.create({
             trigger: m1Ref.current,
-            start: "top 50%",
+            start: "top 46%",
             onEnter: () => {
               gsap.to(m1MetaRef.current!, { opacity: 0.5, y: 0, duration: 1, ease: "power2.out" });
             },
@@ -181,19 +336,60 @@ export default function TechnologyIntro() {
             },
           });
         }
+        if (m1Line1Ref.current) breathe(m1Line1Ref.current, m1Ref.current!, "top 40%");
+        if (m1Line2Ref.current) breathe(m1Line2Ref.current, m1Ref.current!, "top 30%");
 
         /* ════════════════════════════════════════════
-           MOMENT 2 — Reframing
-           "Technology is not electricity. It is curiosity."
+           MOMENT 2 — Reframing, three chapter-title lines
         ════════════════════════════════════════════ */
-        if (m2Line1Ref.current && m2Line2Ref.current && m2Line3Ref.current && m2Ref.current) {
-          splits.push(charReveal(m2Line1Ref.current, m2Ref.current, "top 75%", 0.02, 0.7));
-          splits.push(charReveal(m2Line2Ref.current, m2Ref.current, "top 65%", 0.02, 0.7));
-          splits.push(charReveal(m2Line3Ref.current, m2Ref.current, "top 55%", 0.025, 0.8));
+        if (m2Line1Ref.current && m2Ref.current) {
+          splits.push(
+            charReveal(m2Line1Ref.current, m2Ref.current, {
+              start: "top 75%",
+              stagger: 0.022,
+              duration: 1.0,
+              ease: "power4.out",
+              fromVars: { y: 40, filter: "blur(12px)" },
+            })
+          );
         }
+        if (m2Line2Ref.current && m2Ref.current) {
+          splits.push(
+            charReveal(m2Line2Ref.current, m2Ref.current, {
+              start: "top 63%",
+              stagger: 0.018,
+              duration: 0.85,
+              ease: "power4.out",
+              fromVars: { y: 34, filter: "blur(10px)" },
+            })
+          );
+        }
+        if (m2Line3Ref.current && m2Ref.current) {
+          splits.push(
+            charReveal(m2Line3Ref.current, m2Ref.current, {
+              start: "top 51%",
+              stagger: 0.02,
+              duration: 0.95,
+              ease: "power4.out",
+              fromVars: { y: 46, filter: "blur(14px)", scale: 0.94 },
+              onComplete: () => {
+                // subtle brightness pulse — never a flash
+                gsap.to(m2Line3Ref.current!, {
+                  opacity: 0.85,
+                  duration: 0.35,
+                  ease: "power1.inOut",
+                  yoyo: true,
+                  repeat: 1,
+                });
+              },
+            })
+          );
+        }
+        if (m2Line3Ref.current) breathe(m2Line3Ref.current, m2Ref.current!, "top 35%");
 
         /* ════════════════════════════════════════════
-           MOMENT 3 — Elegant paragraph
+           MOMENT 3 — Museum plaque
+           rule expands → sentence one → pause → sentence two
         ════════════════════════════════════════════ */
         if (m3RuleRef.current && m3Ref.current) {
           gsap.set(m3RuleRef.current, { scaleX: 0 });
@@ -213,31 +409,57 @@ export default function TechnologyIntro() {
           });
         }
         if (m3Para1Ref.current && m3Ref.current) {
-          splits.push(wordReveal(m3Para1Ref.current, m3Ref.current, "top 65%", 0.025, 0.5));
+          splits.push(
+            wordReveal(m3Para1Ref.current, m3Ref.current, {
+              start: "top 62%",
+              stagger: 0.028,
+              duration: 0.65,
+              trackingFrom: "0.05em",
+            })
+          );
         }
         if (m3Para2Ref.current && m3Ref.current) {
-          splits.push(wordReveal(m3Para2Ref.current, m3Ref.current, "top 50%", 0.03, 0.55));
+          splits.push(
+            wordReveal(m3Para2Ref.current, m3Ref.current, {
+              start: "top 46%",
+              stagger: 0.035,
+              duration: 0.7,
+              delay: 0.35,
+              trackingFrom: "0.05em",
+            })
+          );
         }
 
         /* ════════════════════════════════════════════
            MOMENT 4 — Monument word: INGENUITY
+           "carved from stone" · camera push · dim world
         ════════════════════════════════════════════ */
+        if (m4DimRef.current && m4Ref.current) {
+          gsap.set(m4DimRef.current, { opacity: 0 });
+          ScrollTrigger.create({
+            trigger: m4Ref.current,
+            start: "top 60%",
+            onEnter: () => gsap.to(m4DimRef.current!, { opacity: 0.35, duration: 1.4, ease: "power2.out" }),
+            onLeaveBack: () => gsap.to(m4DimRef.current!, { opacity: 0, duration: 0.6, ease: "power2.in" }),
+          });
+        }
         if (m4WordRef.current && m4Ref.current) {
           const bigSplit = new SplitText(m4WordRef.current, { type: "chars" });
           splits.push(bigSplit);
           gsap.set(bigSplit.chars, {
             opacity: 0,
-            y: 60,
-            filter: "blur(12px)",
-            letterSpacing: "0.15em",
+            y: 100,
+            scale: 0.85,
+            filter: "blur(20px)",
+            letterSpacing: "0.2em",
           });
 
-          // Scrubbed parallax — the word scales subtly as user scrolls through
+          // Scrubbed parallax — the word scales subtly as user scrolls through (camera push)
           gsap.fromTo(
             m4WordRef.current,
-            { scale: 0.92 },
+            { scale: 0.98 },
             {
-              scale: 1.04,
+              scale: 1.05,
               ease: "none",
               scrollTrigger: {
                 trigger: m4Ref.current,
@@ -255,23 +477,42 @@ export default function TechnologyIntro() {
               gsap.to(bigSplit.chars, {
                 opacity: 1,
                 y: 0,
+                scale: 1,
                 filter: "blur(0px)",
                 letterSpacing: "0.06em",
-                duration: 1,
-                stagger: 0.04,
-                ease: "power3.out",
+                duration: 2,
+                stagger: 0.045,
+                ease: "power4.out",
+                onComplete: () => {
+                  // signature effect: bronze light sweep, once, no glow
+                  if (m4SweepRef.current) {
+                    gsap.fromTo(
+                      m4SweepRef.current,
+                      { xPercent: -130, opacity: 0 },
+                      {
+                        xPercent: 130,
+                        opacity: 1,
+                        duration: 2.5,
+                        ease: "power1.inOut",
+                        onComplete: () => gsap.set(m4SweepRef.current!, { opacity: 0 }),
+                      }
+                    );
+                  }
+                },
               });
             },
             onLeaveBack: () => {
               gsap.to(bigSplit.chars, {
                 opacity: 0,
-                y: 60,
-                filter: "blur(12px)",
-                letterSpacing: "0.15em",
-                duration: 0.5,
+                y: 100,
+                scale: 0.85,
+                filter: "blur(20px)",
+                letterSpacing: "0.2em",
+                duration: 0.6,
                 stagger: { each: 0.02, from: "end" },
                 ease: "power2.in",
               });
+              if (m4SweepRef.current) gsap.set(m4SweepRef.current, { opacity: 0, xPercent: -130 });
             },
           });
         }
@@ -304,42 +545,70 @@ export default function TechnologyIntro() {
 
         /* ════════════════════════════════════════════
            MOMENT 5 — The archive doorway
+           door line grows → THE ARCHIVE → AWAITS → metadata
         ════════════════════════════════════════════ */
-        if (m5Ref.current) {
-          if (m5Line1Ref.current) splits.push(charReveal(m5Line1Ref.current, m5Ref.current, "top 72%", 0.022, 0.7));
-          if (m5Line2Ref.current) splits.push(charReveal(m5Line2Ref.current, m5Ref.current, "top 62%", 0.02, 0.7));
-          if (m5Line3Ref.current) splits.push(charReveal(m5Line3Ref.current, m5Ref.current, "top 52%", 0.02, 0.7));
-
-          if (m5CountRef.current) {
-            gsap.set(m5CountRef.current, { opacity: 0, y: 14 });
-            ScrollTrigger.create({
-              trigger: m5Ref.current,
-              start: "top 42%",
-              onEnter: () => {
-                gsap.to(m5CountRef.current!, { opacity: 0.6, y: 0, duration: 0.8, ease: "power2.out" });
-              },
-              onLeaveBack: () => {
-                gsap.to(m5CountRef.current!, { opacity: 0, y: 14, duration: 0.4, ease: "power2.in" });
-              },
-            });
-          }
-          if (m5DoorRef.current) {
-            gsap.set(m5DoorRef.current, { scaleY: 0 });
-            ScrollTrigger.create({
-              trigger: m5Ref.current,
-              start: "top 50%",
-              onEnter: () => {
-                gsap.to(m5DoorRef.current!, { scaleY: 1, duration: 1.6, ease: "power3.inOut" });
-              },
-              onLeaveBack: () => {
-                gsap.to(m5DoorRef.current!, { scaleY: 0, duration: 0.6, ease: "power2.in" });
-              },
-            });
-          }
+        if (m5DoorRef.current && m5Ref.current) {
+          gsap.set(m5DoorRef.current, { scaleY: 0 });
+          ScrollTrigger.create({
+            trigger: m5Ref.current,
+            start: "top 74%",
+            onEnter: () => {
+              gsap.to(m5DoorRef.current!, { scaleY: 1, duration: 1.6, ease: "power3.inOut" });
+            },
+            onLeaveBack: () => {
+              gsap.to(m5DoorRef.current!, { scaleY: 0, duration: 0.6, ease: "power2.in" });
+            },
+          });
         }
+        if (m5Line1Ref.current && m5Ref.current) {
+          splits.push(
+            charReveal(m5Line1Ref.current, m5Ref.current, {
+              start: "top 64%",
+              stagger: 0.024,
+              duration: 1.0,
+              ease: "power4.out",
+              fromVars: { y: 50, filter: "blur(12px)" },
+            })
+          );
+        }
+        if (m5Line2Ref.current && m5Ref.current) {
+          splits.push(
+            charReveal(m5Line2Ref.current, m5Ref.current, {
+              start: "top 54%",
+              stagger: 0.02,
+              duration: 0.9,
+              ease: "power4.out",
+              fromVars: { y: 40, filter: "blur(10px)" },
+            })
+          );
+        }
+        if (m5CountRef.current && m5Ref.current) {
+          gsap.set(m5CountRef.current, { opacity: 0, y: 14 });
+          ScrollTrigger.create({
+            trigger: m5Ref.current,
+            start: "top 40%",
+            onEnter: () => {
+              gsap.to(m5CountRef.current!, { opacity: 0.6, y: 0, duration: 0.8, ease: "power2.out" });
+            },
+            onLeaveBack: () => {
+              gsap.to(m5CountRef.current!, { opacity: 0, y: 14, duration: 0.4, ease: "power2.in" });
+            },
+          });
+        }
+        if (m5Line3Ref.current && m5Ref.current) {
+          splits.push(
+            charReveal(m5Line3Ref.current, m5Ref.current, {
+              start: "top 32%",
+              stagger: 0.015,
+              duration: 0.6,
+              fromVars: { y: 14, filter: "blur(6px)", letterSpacing: "0.5em" },
+            })
+          );
+        }
+        if (m5Line1Ref.current) breathe(m5Line1Ref.current, m5Ref.current!, "top 30%");
 
         /* ════════════════════════════════════════════
-           WARM SPOTLIGHT — slow drift
+           AMBIENT — warm spotlight drift
         ════════════════════════════════════════════ */
         if (spotRef.current) {
           gsap.to(spotRef.current, {
@@ -354,6 +623,31 @@ export default function TechnologyIntro() {
             },
           });
         }
+
+        /* ─── film grain — slow, subtle drift, never still ─── */
+        if (grainRef.current) {
+          gsap.to(grainRef.current, {
+            backgroundPosition: "137px 91px",
+            duration: 9,
+            ease: "none",
+            repeat: -1,
+            yoyo: true,
+          });
+        }
+
+        /* ─── dust motes — tiny, slow, independent drifting ─── */
+        gsap.utils.toArray<HTMLElement>(".dust-mote").forEach((mote, i) => {
+          gsap.to(mote, {
+            y: i % 2 === 0 ? -16 : 16,
+            x: i % 3 === 0 ? 8 : -8,
+            opacity: 0.5,
+            duration: 6 + i,
+            ease: "sine.inOut",
+            yoyo: true,
+            repeat: -1,
+            delay: i * 0.4,
+          });
+        });
 
         return () => {
           splits.forEach((s) => s.revert());
@@ -383,6 +677,41 @@ export default function TechnologyIntro() {
             "radial-gradient(ellipse 700px 900px at var(--spot-x, 30%) var(--spot-y, 30%), rgba(176,141,87,0.35) 0%, transparent 70%)",
         }}
       />
+
+      {/* ─── Film grain — barely-there texture, always in motion ─── */}
+      <div
+        ref={grainRef}
+        className="pointer-events-none"
+        style={{
+          position: "fixed",
+          inset: 0,
+          zIndex: 2,
+          opacity: 0.035,
+          mixBlendMode: "overlay",
+          backgroundImage:
+            "url(\"data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E\")",
+          backgroundRepeat: "repeat",
+        }}
+      />
+
+      {/* ─── Dust motes — ambient, fixed positions, slow independent drift ─── */}
+      {DUST.map((d, i) => (
+        <div
+          key={i}
+          className="dust-mote pointer-events-none"
+          style={{
+            position: "fixed",
+            top: d.top,
+            left: d.left,
+            width: d.size,
+            height: d.size,
+            borderRadius: "50%",
+            background: BRONZE,
+            opacity: 0.25,
+            zIndex: 2,
+          }}
+        />
+      ))}
 
       {/* ─── Thin vertical grid rule (left) ─── */}
       <div
@@ -428,6 +757,19 @@ export default function TechnologyIntro() {
           padding: "60px 40px",
         }}
       >
+        {/* Soft warm spotlight passing behind the inscription */}
+        <div
+          ref={m1SpotRef}
+          className="pointer-events-none"
+          style={{
+            position: "absolute",
+            inset: 0,
+            background:
+              "radial-gradient(ellipse 600px 400px at 50% 45%, rgba(176,141,87,0.16) 0%, transparent 72%)",
+            zIndex: 0,
+          }}
+        />
+
         {/* Corner metadata */}
         <div
           style={{
@@ -468,9 +810,10 @@ export default function TechnologyIntro() {
             color: STONE,
             textAlign: "center",
             letterSpacing: "-0.02em",
+            perspective: 700,
           }}
         >
-          WE DID NOT INVENT
+          BEFORE THERE WERE MACHINES
         </div>
         <div
           ref={m1Line2Ref}
@@ -483,9 +826,10 @@ export default function TechnologyIntro() {
             textAlign: "center",
             letterSpacing: "-0.02em",
             marginTop: "0.08em",
+            perspective: 700,
           }}
         >
-          POSSIBILITY
+          THERE WERE QUESTIONS
         </div>
 
         <div
@@ -500,9 +844,9 @@ export default function TechnologyIntro() {
             lineHeight: 2.2,
           }}
         >
-          WE INVENTED THE FUTURE
+          HUMANITY&apos;S FIRST CREATION
           <br />
-          BEFORE WE KNEW WHAT IT WAS
+          WAS AN IDEA
         </div>
       </section>
 
@@ -548,7 +892,7 @@ export default function TechnologyIntro() {
             marginTop: "0.12em",
           }}
         >
-          ELECTRICITY
+          WHAT WE CREATE
         </div>
         <div
           ref={m2Line3Ref}
@@ -563,7 +907,7 @@ export default function TechnologyIntro() {
             marginTop: "0.2em",
           }}
         >
-          IT IS CURIOSITY
+          IT IS WHY WE CREATE
         </div>
 
         {/* Thin horizontal rule */}
@@ -618,9 +962,9 @@ export default function TechnologyIntro() {
             letterSpacing: "0.01em",
           }}
         >
-          Every civilization leaves behind its stories.
+          Time forgets many things.
           <br />
-          Most are told in language.
+          But every invention is a message sent forward.
         </div>
 
         <div
@@ -637,7 +981,7 @@ export default function TechnologyIntro() {
             fontWeight: 500,
           }}
         >
-          Some leave behind machines.
+          A conversation between generations.
         </div>
 
         {/* Subtle attribution */}
@@ -651,7 +995,7 @@ export default function TechnologyIntro() {
             marginTop: 64,
           }}
         >
-          MUSEUM ARCHIVE — SECTION II
+          MUSEUM ARCHIVE — FRAGMENTS OF IMAGINATION
         </div>
       </section>
 
@@ -670,19 +1014,53 @@ export default function TechnologyIntro() {
           padding: "60px 40px",
         }}
       >
+        {/* World dims slightly as the monument takes the stage */}
         <div
-          ref={m4WordRef}
+          ref={m4DimRef}
+          className="pointer-events-none"
           style={{
-            fontFamily: "var(--font-display), system-ui, sans-serif",
-            fontSize: "clamp(70px, 16vw, 260px)",
-            lineHeight: 0.82,
-            textTransform: "uppercase",
-            color: STONE,
-            textAlign: "center",
-            letterSpacing: "0.06em",
+            position: "absolute",
+            inset: 0,
+            background: INK,
+            zIndex: 0,
           }}
+        />
+
+        <div
+          ref={m4WordWrapRef}
+          style={{ position: "relative", overflow: "hidden", display: "inline-block", zIndex: 1 }}
         >
-          INGENUITY
+          <div
+            ref={m4WordRef}
+            style={{
+              fontFamily: "var(--font-display), system-ui, sans-serif",
+              fontSize: "clamp(70px, 16vw, 260px)",
+              lineHeight: 0.82,
+              textTransform: "uppercase",
+              color: STONE,
+              textAlign: "center",
+              letterSpacing: "0.06em",
+            }}
+          >
+            INGENUITY
+          </div>
+
+          {/* Signature effect — bronze light sweeping across engraved stone, once */}
+          <div
+            ref={m4SweepRef}
+            className="pointer-events-none"
+            style={{
+              position: "absolute",
+              top: 0,
+              bottom: 0,
+              left: 0,
+              width: "60%",
+              opacity: 0,
+              background:
+                "linear-gradient(115deg, transparent 30%, rgba(176,141,87,0.5) 50%, transparent 70%)",
+              mixBlendMode: "overlay",
+            }}
+          />
         </div>
 
         <div
@@ -694,9 +1072,10 @@ export default function TechnologyIntro() {
             color: BRONZE,
             marginTop: 40,
             textAlign: "center",
+            zIndex: 1,
           }}
         >
-          THE DEFINING TRAIT OF EVERY ERA
+          THE FORCE THAT TURNED IMPOSSIBILITY INTO REALITY
         </div>
 
         {/* Taxonomy labels */}
@@ -708,6 +1087,7 @@ export default function TechnologyIntro() {
             marginTop: 64,
             flexWrap: "wrap",
             justifyContent: "center",
+            zIndex: 1,
           }}
         >
           {TAXONOMY.map((label, i) => (
@@ -769,7 +1149,7 @@ export default function TechnologyIntro() {
             marginTop: "0.1em",
           }}
         >
-          OPENS
+          AWAITS
         </div>
 
         {/* Vertical door line */}
@@ -797,10 +1177,10 @@ export default function TechnologyIntro() {
             lineHeight: 2.6,
           }}
         >
-          7 LOST TECHNOLOGIES
+          SEVEN MACHINES THAT CHANGED
           <br />
           <span style={{ color: STONE_DIM, fontSize: 8, letterSpacing: "0.4em" }}>
-            WAIT BEYOND THIS POINT
+            HOW HUMANS DREAM
           </span>
         </div>
 
@@ -816,7 +1196,7 @@ export default function TechnologyIntro() {
             textAlign: "center",
           }}
         >
-          SCROLL TO ENTER
+          SCROLL TO ENTER THE ARCHIVE
         </div>
       </section>
     </div>
