@@ -51,11 +51,11 @@ export default function LoadingScreen({ onComplete }: LoadingScreenProps) {
         /* ═══════════════════════════════════════════
            EXIT — Archive doors open with warm light
            ═══════════════════════════════════════════ */
-        const exit = gsap.timeline({ 
+        const exit = gsap.timeline({
           onComplete: () => {
             console.log("LOADING COMPLETE");
             onComplete();
-          } 
+          }
         });
 
         // Content fades
@@ -75,7 +75,7 @@ export default function LoadingScreen({ onComplete }: LoadingScreenProps) {
           },
           0.2
         );
-    
+
       },
     });
 
@@ -84,7 +84,7 @@ export default function LoadingScreen({ onComplete }: LoadingScreenProps) {
        "An old scientific machine activating"
        ═══════════════════════════════════════════════════════════ */
 
-   
+
     /* ═══════════════════════════════════════════════════════════
        PHASE 2 — RESTORATION PROCESS (2.5–5s)
        "A museum archive waking up"
@@ -93,42 +93,19 @@ export default function LoadingScreen({ onComplete }: LoadingScreenProps) {
     tl.set(phase2Ref.current, { opacity: 1 });
 
     // "RESTORING HISTORICAL DATABASE..." typewriter
-    tl.to(restoringTextRef.current, {
-      text: { value: "RESTORING HISTORICAL DATABASE...", delimiter: "" },
-      duration: 1,
-      ease: "none",
-    });
+
 
     // "MEMORY BLOCK" label fades in
-    tl.fromTo(
-      progressLabelRef.current,
-      { opacity: 0 },
-      { opacity: 1, duration: 0.4, ease: "power2.out" },
-      "-=0.3"
-    );
+
 
     // Progress blocks fill sequentially — scientific instrument reading
-    const blocks = progressBlocksRef.current?.querySelectorAll(".mem-block");
-    if (blocks) {
-      blocks.forEach((block, i) => {
-        tl.to(
-          block,
-          {
-            opacity: 1,
-            backgroundColor: "var(--bronze)",
-            duration: 0.12,
-            ease: "steps(1)",
-          },
-          i === 0 ? undefined : `-=${0.04}`
-        );
-      });
-    }
+
 
     // Brief hold — system stabilizes
-    tl.to({}, { duration: 0.4 });
+
 
     // Phase 2 exits
-    tl.to(phase2Ref.current, { opacity: 0, duration: 0.3, ease: "power2.in" });
+
 
     /* ═══════════════════════════════════════════════════════════
        PHASE 3 — ARCHIVE COUNTER (5–7.5s)
@@ -176,60 +153,10 @@ export default function LoadingScreen({ onComplete }: LoadingScreenProps) {
     // Phase 3 exits
     tl.to(phase3Ref.current, { opacity: 0, duration: 0.3, ease: "power2.in" });
 
-    /* ═══════════════════════════════════════════════════════════
-       PHASE 4 — ARCHIVE RESTORED (7.5–8.5s)
-       "Old scientific equipment turning on"
-       Subtle analog interference — NOT gaming glitch
-       ═══════════════════════════════════════════════════════════ */
 
-    tl.set(phase4Ref.current, { opacity: 1 });
 
-    if (restoredTextRef.current) {
-      // Text materializes from blur — old monitor powering on
-      tl.fromTo(
-        restoredTextRef.current,
-        { opacity: 0, filter: "blur(12px)", y: 5 },
-        { opacity: 1, filter: "blur(0px)", y: 0, duration: 0.5, ease: "power3.out" }
-      );
 
-      // Subtle analog interference — horizontal displacement + flicker (0.3s max)
-      tl.to(restoredTextRef.current, {
-        x: 3,
-        opacity: 0.6,
-        duration: 0.04,
-        ease: "none",
-      });
-      tl.to(restoredTextRef.current, {
-        x: -2,
-        opacity: 0.9,
-        duration: 0.04,
-        ease: "none",
-      });
-      tl.to(restoredTextRef.current, {
-        x: 1,
-        opacity: 0.5,
-        duration: 0.03,
-        ease: "none",
-      });
-      tl.to(restoredTextRef.current, {
-        x: -1,
-        opacity: 0.8,
-        duration: 0.04,
-        ease: "none",
-      });
-      tl.to(restoredTextRef.current, {
-        x: 0,
-        opacity: 1,
-        duration: 0.1,
-        ease: "power2.out",
-      });
-    }
 
-    // Hold — signal stabilizes
-    tl.to({}, { duration: 0.5 });
-
-    // Phase 4 exits
-    tl.to(phase4Ref.current, { opacity: 0, duration: 0.3, ease: "power2.in" });
 
     /* ═══════════════════════════════════════════════════════════
        PHASE 5 — FINAL STATE (8.5–10s)

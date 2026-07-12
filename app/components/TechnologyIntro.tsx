@@ -323,14 +323,7 @@ export default function TechnologyIntro({ isReady }: { isReady: boolean }) {
                   0.1
                 );
               }
-              if (m4SweepRef.current) {
-                tl.fromTo(
-                  m4SweepRef.current,
-                  { x: "-100%", opacity: 1 },
-                  { x: "200%", duration: 2.2, ease: "power2.inOut" },
-                  "+=0.15"
-                );
-              }
+
               if (m4SubRef.current) {
                 tl.fromTo(m4SubRef.current, BLOCK_HIDDEN, BLOCK_VISIBLE, 0.6);
               }
@@ -593,7 +586,7 @@ export default function TechnologyIntro({ isReady }: { isReady: boolean }) {
           ref={m1MetaRef}
           style={{
             fontFamily: "var(--font-mono), monospace",
-            fontSize: 9,
+            fontSize: 15,
             letterSpacing: "0.35em",
             color: STONE_DIM,
             marginTop: 48,
@@ -755,7 +748,7 @@ export default function TechnologyIntro({ isReady }: { isReady: boolean }) {
           ref={m3AttribRef}
           style={{
             fontFamily: "var(--font-mono), monospace",
-            fontSize: 8,
+            fontSize: 10,
             letterSpacing: "0.35em",
             color: ARCHIVE_RED,
             opacity: 0.45,
@@ -796,35 +789,21 @@ export default function TechnologyIntro({ isReady }: { isReady: boolean }) {
           }}
         >
           INGENUITY
-          {/* Bronze light sweep overlay */}
-          <div
-            ref={m4SweepRef}
-            className="pointer-events-none"
-            style={{
-              position: "absolute",
-              top: 0,
-              left: 0,
-              width: "40%",
-              height: "100%",
-              background: `linear-gradient(90deg, transparent 0%, rgba(176,141,87,0.12) 40%, rgba(176,141,87,0.2) 50%, rgba(176,141,87,0.12) 60%, transparent 100%)`,
-              transform: "translateX(-100%)",
-              opacity: 0,
-            }}
-          />
+
         </div>
 
         <div
           ref={m4SubRef}
           style={{
             fontFamily: "var(--font-mono), monospace",
-            fontSize: 10,
+            fontSize: 15,
             letterSpacing: "0.5em",
             color: BRONZE,
             marginTop: 40,
             textAlign: "center",
           }}
         >
-          THE FORCE THAT TURNED IMPOSSIBILITY INTO REALITY
+          THE HUMAN INSTINCT TO CREATE WHAT DOES NOT EXIST
         </div>
 
         {/* Taxonomy labels */}
@@ -882,7 +861,7 @@ export default function TechnologyIntro({ isReady }: { isReady: boolean }) {
             letterSpacing: "-0.01em",
           }}
         >
-          THE ARCHIVE
+          LOST INVENTIONS
         </div>
         <div
           ref={m5Line2Ref}
@@ -897,7 +876,7 @@ export default function TechnologyIntro({ isReady }: { isReady: boolean }) {
             marginTop: "0.1em",
           }}
         >
-          AWAITS
+          AWAITS TO BE DISCOVERED
         </div>
 
         {/* Vertical door line */}
@@ -917,7 +896,7 @@ export default function TechnologyIntro({ isReady }: { isReady: boolean }) {
           ref={m5CountRef}
           style={{
             fontFamily: "var(--font-mono), monospace",
-            fontSize: 10,
+            fontSize: 15,
             letterSpacing: "0.35em",
             color: BRONZE,
             textAlign: "center",
@@ -925,10 +904,10 @@ export default function TechnologyIntro({ isReady }: { isReady: boolean }) {
             lineHeight: 2.6,
           }}
         >
-          SEVEN MACHINES THAT CHANGED
+          SEVEN MACHINES 
           <br />
-          <span style={{ color: STONE_DIM, fontSize: 8, letterSpacing: "0.4em" }}>
-            HOW HUMANS DREAM
+          <span style={{ color: STONE_DIM, fontSize: 12, letterSpacing: "0.4em" }}>
+          SEVEN STORIES OF HUMAN POSSIBILITY HUMANS DREAM
           </span>
         </div>
 
